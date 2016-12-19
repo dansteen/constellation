@@ -34,25 +34,40 @@ func ProcessFile(filePath string, includeDirs []string) []types.Container {
 	for key, data := range config {
 		switch key {
 		case "require":
-			// make sure the value is a string
+			// ensure that the value is what we expect
 			switch data.(type) {
+			// if it is, we process
 			case string:
-				// do nothing
-				_ = 1
+				filePath, err := findFile(data.(string), includeDirs)
+				util.Check(err)
+				// get containers from the requires and add them to our list
+				requireContainers := ProcessFile(filePath, make([]string, 0))
+				containers = append(containers, requireContainers...)
+				// otherwise we error
 			default:
 				util.Check(errors.New(fmt.Sprintf("Invalid value for 'require' stanza in %s.  Needs a String type", filePath)))
 			}
-			filePath, err := findFile(data.(string), includeDirs)
-			util.Check(err)
-			// get containers from the requires and add them to our list
-			requireContainers := ProcessFile(filePath, make([]string, 0))
-			containers = append(containers, requireContainers...)
 		case "containers":
-			log.Println("containers")
+			// make sure the value is a map
+			switch data.(type) {
+			case map[interface{}]interface{}:
+				// run through each container stanza
+				for name, containerData := range data.(map[interface{}]interface{}) {
+					// make sure the container data is valid
+					newContainer, err := processContainerConfig(containerData, name.(string))
+					if err != nil {
+						util.Check(errors.New(fmt.Sprintf("%s in %s", err.Error(), filePath)))
+					}
+					containers = append(containers, newContainer)
+				}
+			default:
+				util.Check(errors.New(fmt.Sprintf("Invalid value for 'containers' stanza in %s.  Needs a Hash type", filePath)))
+			}
 		default:
 			log.Printf("invalid stanza: %s.", key)
 		}
 	}
+	log.Printf("%+v\n", containers)
 	return containers
 }
 
@@ -78,4 +93,56 @@ func findFile(fileName string, includeDirs []string) (string, error) {
 	}
 	// if we get here, then no paths exist.  Thats an error.
 	return "", errors.New(fmt.Sprintf("File not found: %s", fileName))
+}
+
+// processContainerConfig will generate a container from the provided config
+func processContainerConfig(config interface{}, name string) (types.Container, error) {
+	// create our new container
+	container := types.NewContainer(name)
+	// make sure the config is valid
+	switch config.(type) {
+	// if it is
+	case map[interface{}]interface{}:
+		// create a value to hold our error
+		var err error
+		// run through our config and handle each stanza
+		for stanza, data := range config.(map[interface{}]interface{}) {
+			switch stanza {
+			case "image":
+				if err = container.SetImageFromConfig(data); err != nil {
+					break
+				}
+			case "exec":
+				if err = container.SetExecFromConfig(data); err != nil {
+					break
+				}
+			case "mounts":
+				if err = container.SetMountsFromConfig(data); err != nil {
+					break
+				}
+			case "state_conditions":
+				if err = container.SetStateConditionsFromConfig(data); err != nil {
+					break
+				}
+			case "depends_on":
+				if err = container.SetDependsOnFromConfig(data); err != nil {
+					break
+				}
+			case "environment":
+				if err = container.SetEnvironmentFromConfig(data); err != nil {
+					break
+				}
+			default:
+				err = errors.New(fmt.Sprintf("Invalid stanza %s", stanza))
+				break
+			}
+		}
+		if err != nil {
+			return types.Container{}, errors.New(fmt.Sprintf("%s in %s", err.Error(), name))
+		}
+		// if we don't recognize the type we error out
+	default:
+		return types.Container{}, errors.New(fmt.Sprintf("Needs a Hash type for container %s", name))
+	}
+	return container, nil
 }

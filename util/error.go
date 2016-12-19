@@ -1,7 +1,11 @@
 package util
 
+import "log"
+import "os"
+
 func Check(e error) {
 	if e != nil {
-		panic(e)
+		log.Println(e)
+		os.Exit(1)
 	}
 }

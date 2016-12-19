@@ -52,5 +52,5 @@ func check(e error) {
 
 func run(cmd *cobra.Command, args []string) {
 	fmt.Println("run called")
-	config.ProcessFile(cfgFile)
+	config.ProcessFile(cfgFile, includeDirs)
 }

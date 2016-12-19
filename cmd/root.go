@@ -53,7 +53,7 @@ func init() {
 	// will be global for your application.
 
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.constellation.yaml)")
-	RootCmd.PersistentFlags().StringSliceVarP(&includeDirs, "include", "I", []string, "Directories to look in for files included via the 'require' stanza")
+	RootCmd.PersistentFlags().StringSliceVarP(&includeDirs, "include", "I", make([]string, 0), "Directories to look in for files included via the 'require' stanza")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	RootCmd.Flags().BoolP("debug", "d", false, "Help message for toggle")
