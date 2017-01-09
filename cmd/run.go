@@ -15,9 +15,15 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/dansteen/constellation/config"
+	"github.com/dansteen/constellation/types"
+	"github.com/dansteen/constellation/util"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/cobra"
 )
 
@@ -44,13 +50,44 @@ func init() {
 
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 func run(cmd *cobra.Command, args []string) {
+	configPath := fmt.Sprintf("/tmp/constellation-%d", os.Getpid())
 	fmt.Println("run called")
-	config.ProcessFile(cfgFile, includeDirs)
+	// generate our network file
+	network, err := types.NewNetworkConfig(projectName)
+	util.Check(err)
+	// convert our config to json
+	networkJSON, err := json.MarshalIndent(network, "", "  ")
+	// make our config folder
+	util.Check(os.MkdirAll(fmt.Sprintf("%s/net.d", configPath), 0755))
+	// write our network files
+	util.Check(ioutil.WriteFile(fmt.Sprintf("%s/net.d/%s.conf", configPath, projectName), networkJSON, 0644))
+	// process our configs
+	configData := config.ProcessFile(podFile, includeDirs)
+
+	// initialize the containers
+	for _, container := range configData.Containers {
+		util.Check(container.Init(configData.Containers))
+	}
+
+	// make sure to create our log volumes
+	for _, volume := range configData.Volumes {
+		util.Check(volume.CreateDir())
+	}
+
+	// determin the order we need to execute in to satisfy dependencies
+	order, err := configData.DependencyOrder()
+	util.Check(err)
+	//spew.Dump(configData)
+
+	for _, containerName := range order {
+		// grab our container
+		container := configData.Containers[containerName]
+		// run our container
+		err := container.Run(configPath, projectName, configData.Volumes)
+		util.Check(err)
+
+	}
+
+	fmt.Println(order)
 }

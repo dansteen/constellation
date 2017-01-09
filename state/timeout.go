@@ -3,48 +3,37 @@ package state
 import (
 	"errors"
 	"fmt"
-	"reflect"
+	"log"
+	"time"
 )
 
 type TimeoutCondition struct {
-	Duration int    `json:duration`
+	Duration int64  `json:duration`
 	Status   string `json:status`
 }
 
-// NewTimeoutConditionFromConfig will create an exist condition from the provided config
-func NewTimeoutConditionFromConfig(config interface{}) (TimeoutCondition, error) {
-	// create a new exit condition and prime it
-	condition := TimeoutCondition{}
-
-	// make sure the value type is correct in general
-	switch config.(type) {
-	case map[interface{}]interface{}:
-		for stanza, value := range config.(map[string]interface{}) {
-			// make sure a string has been specified
-			switch stanza {
-			case "duration":
-				switch value.(type) {
-				case int:
-					condition.Duration = value.(int)
-				default:
-					return TimeoutCondition{}, errors.New(fmt.Sprintf("duration must to be a number of seconds. Got %s for timeout", reflect.TypeOf(value)))
-				}
-			case "status":
-				switch value.(type) {
-				case string:
-					switch value {
-					case "success", "failure":
-						condition.Status = value.(string)
-					default:
-						return TimeoutCondition{}, errors.New(fmt.Sprintf("status needs to be one of 'success' or 'failure'. Got %s for timeout", value))
-					}
-				default:
-					return TimeoutCondition{}, errors.New(fmt.Sprintf("timeout expects stanzas 'duration' or 'status'. Got %s", stanza))
-				}
-			}
-		}
-	default:
-		return TimeoutCondition{}, errors.New(fmt.Sprintf("Needs to be a Hash type for timeout.  Got %s", reflect.TypeOf(config)))
+func (cond *TimeoutCondition) Handle(results chan<- error, stop <-chan bool, logger *log.Logger) {
+	logger.Printf("Waiting for timeout: %ds", cond.Duration)
+	// start a timeout
+	timeout := make(chan bool)
+	go func() {
+		time.Sleep(time.Second * time.Duration(cond.Duration))
+		timeout <- true
+	}()
+	// wait for our timeout or the done channel
+	select {
+	case <-timeout:
+		logger.Println("Hit Timeout")
+	case <-stop:
+		logger.Println("Timeout Cancelled")
+		return
 	}
-	return condition, nil
+
+	// depending on what the status is set to be we publish our result
+	switch cond.Status {
+	case "success":
+		results <- nil
+	case "failure":
+		results <- errors.New(fmt.Sprintf("Hit Timeout. Specified as failure."))
+	}
 }

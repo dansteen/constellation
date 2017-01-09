@@ -1,6 +1,12 @@
-hash: a4e90abb79da6d35d0407cb324ef54e1323bd8c31b234f8427dd07649d5d6e03
-updated: 2016-12-19T13:28:59.411474746-05:00
+hash: ded4d2976341539272fdcc3c3734456d34a5a81387b23898bd6258fdbe988b5a
+updated: 2016-12-29T11:09:11.882519346-05:00
 imports:
+- name: github.com/davecgh/go-spew
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  subpackages:
+  - spew
+- name: github.com/fatih/color
+  version: 9ab0325f4904aac7c2c60db3cff3b35f415575c7
 - name: github.com/fsnotify/fsnotify
   version: fd9ec7deca8bf46ecd2a795baaacf2b3a9be1197
 - name: github.com/ghodss/yaml
@@ -16,10 +22,21 @@ imports:
   - hcl/strconv
   - json/scanner
   - json/token
+- name: github.com/hpcloud/tail
+  version: 915e5feba042395f5fda4dbe9c0e99aeab3088b3
+  subpackages:
+  - ratelimiter
+  - util
+  - watch
+  - winfile
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/magiconair/properties
   version: 9c47895dc1ce54302908ab8a43385d1f5df2c11c
+- name: github.com/mattn/go-colorable
+  version: d228849504861217f796da67fae4f6e347643f15
+- name: github.com/mattn/go-isatty
+  version: 30a891c33c7cde7b02a981314b4228ec99380cca
 - name: github.com/mitchellh/mapstructure
   version: bfdb1a85537d60bc7e954e600c250219ea497417
 - name: github.com/pelletier/go-buffruneio
@@ -40,6 +57,11 @@ imports:
   version: 25f8b5b07aece3207895bf19f7ab517eb3b22a40
 - name: github.com/spf13/viper
   version: 5ed0fc31f7f453625df314d8e66b9791e8d13003
+- name: github.com/twmb/algoimpl
+  version: 716f8e78b563212cfefb120bedc265741f51d1a4
+  subpackages:
+  - go/graph
+  - go/graph/lite
 - name: golang.org/x/sys
   version: d75a52659825e75fff6158388dddc6a5b04f9ba5
   subpackages:
@@ -49,6 +71,10 @@ imports:
   subpackages:
   - transform
   - unicode/norm
+- name: gopkg.in/fsnotify.v1
+  version: 7be54206639f256967dd82fa767397ba5f8f48f5
+- name: gopkg.in/tomb.v1
+  version: c131134a1947e9afd9cecfe11f4c6dff0732ae58
 - name: gopkg.in/yaml.v2
   version: a5b47d31c556af34a302ce5d659e6fea44d90de0
 devImports: []

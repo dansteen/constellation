@@ -18,12 +18,16 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+var podFile string
 var includeDirs []string
+var projectName string
+var noColor bool
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -53,10 +57,19 @@ func init() {
 	// will be global for your application.
 
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.constellation.yaml)")
+	RootCmd.PersistentFlags().StringVarP(&podFile, "podFile", "p", "", "path to a yaml file defining your constellation")
+	RootCmd.PersistentFlags().StringVarP(&projectName, "name", "n", "", "an arbitrary name to identify this invocation")
 	RootCmd.PersistentFlags().StringSliceVarP(&includeDirs, "include", "I", make([]string, 0), "Directories to look in for files included via the 'require' stanza")
+	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable color output")
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	RootCmd.Flags().BoolP("debug", "d", false, "Help message for toggle")
+
+	// take some actions based on flags
+	if noColor {
+		color.NoColor = true // disables colorized output
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.

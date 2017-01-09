@@ -3,3 +3,13 @@ import:
 - package: github.com/ghodss/yaml
 - package: github.com/spf13/cobra
 - package: github.com/spf13/viper
+- package: github.com/davecgh/go-spew
+  subpackages:
+  - spew
+- package: github.com/twmb/algoimpl
+  subpackages:
+  - go/graph
+- package: github.com/hpcloud/tail
+- package: github.com/fatih/color
+- package: github.com/mattn/go-colorable
+- package: github.com/mattn/go-isatty

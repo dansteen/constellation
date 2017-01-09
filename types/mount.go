@@ -1,15 +1,16 @@
 package types
 
+import "fmt"
+
 // Mount defines a volume that is mounted into a container
 type Mount struct {
-	volume string
-	path   string
+	Volume string
+	Path   string
 }
 
-// returns a new Mount struct populated with the supplied values
-func NewMount(volume string, path string) Mount {
-	return Mount{
-		volume: volume,
-		path:   path,
-	}
+func (mount *Mount) GenerateCommandLine() []string {
+	mountArray := make([]string, 2)
+	mountArray[0] = "--mount"
+	mountArray[1] = fmt.Sprintf("volume=%s,target=%s", mount.Volume, mount.Path)
+	return mountArray
 }
