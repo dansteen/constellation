@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/dansteen/constellation/config"
 	"github.com/dansteen/constellation/types"
@@ -65,6 +67,57 @@ func run(cmd *cobra.Command, args []string) {
 	// process our configs
 	configData := config.ProcessFile(podFile, includeDirs)
 
+	// handle image overrides passed into the command line.
+	imageRE := regexp.MustCompile("(:^|[^/]*/)?([^:]*):?(.*)")
+	for _, override := range imageOverrides {
+		// break the override into parts
+		overrideParts := imageRE.FindStringSubmatch(override)
+		overrideSource := overrideParts[1]
+		overrideName := overrideParts[2]
+		overrideVersion := overrideParts[3]
+		for name, container := range configData.Containers {
+			// break the image name into parts
+			containerParts := imageRE.FindStringSubmatch(container.Image)
+			containerSource := containerParts[1]
+			containerName := containerParts[2]
+			// if it matches
+			if containerName == overrideName {
+				newImage := make([]string, 0)
+				// generate our new image line
+				if len(overrideSource) == 0 {
+					newImage = append(newImage, containerSource)
+				} else {
+					newImage = append(newImage, overrideSource)
+				}
+				newImage = append(newImage, overrideName)
+				newImage = append(newImage, ":", overrideVersion)
+				container.Image = strings.Join(newImage, "")
+				configData.Containers[name] = container
+			}
+		}
+	}
+
+	// handle volume overrides passed into the command line
+	for _, override := range volumeOverrides {
+		overrideParts := strings.SplitN(override, ":", 2)
+		volName := overrideParts[0]
+		volPath := overrideParts[1]
+		for name, volumes := range configData.Volumes {
+			if name == volName {
+				volumes.Path = volPath
+				configData.Volumes[name] = volumes
+			}
+		}
+	}
+
+	// handle hostsEntries passed into the command line
+	customHosts := make([]types.HostsEntry, 0)
+	for _, entry := range hostsEntries {
+		host, err := types.HostsEntryFromString(entry)
+		util.Check(err)
+		customHosts = append(customHosts, host)
+	}
+
 	// initialize the containers
 	for _, container := range configData.Containers {
 		util.Check(container.Init(configData.Containers))
@@ -84,7 +137,7 @@ func run(cmd *cobra.Command, args []string) {
 		// grab our container
 		container := configData.Containers[containerName]
 		// run our container
-		err := container.Run(configPath, projectName, configData.Volumes)
+		err := container.Run(configPath, projectName, configData.Volumes, customHosts)
 		util.Check(err)
 
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/dansteen/constellation/rkt"
 	"github.com/dansteen/constellation/state"
 	"github.com/dansteen/constellation/util"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/color"
 )
 
@@ -62,7 +63,7 @@ func (container *Container) Init(containers map[string]*Container) error {
 }
 
 // Run will run a container.  It will return an error message if the container fails by any of the containers StateConditions
-func (container *Container) Run(configPath string, projectName string, volumes map[string]Volume) error {
+func (container *Container) Run(configPath string, projectName string, volumes map[string]Volume, hostsEntries []HostsEntry) error {
 	// set up logging for this run
 	colors := util.RandomColor()
 	ourColor := color.New(colors...).SprintfFunc()
@@ -73,8 +74,24 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	var result error
 	result = nil
 
+	// check to see if we are not already running a container with this project and name
+	// get our name
+	name, err := rkt.GetAppName(projectName, container.Name)
+	// get a list of running pods
+	runningPods, err := rkt.GetRunningPods(projectName)
+	if err != nil {
+		return err
+	}
+	// a pod of our name is already running, we dont continue
+	for runningName, _ := range runningPods.Pods {
+		if runningName == name {
+			logger.Printf("Using already running container %s for %s.", runningName, container.Name)
+			return nil
+		}
+	}
+
 	// get our command line
-	commandLine, err := container.getCommandLine(projectName, logger)
+	commandLine, err := container.getCommandLine(projectName, runningPods, logger)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,8 +100,13 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	for _, volume := range volumes {
 		commandLine = append(volume.GenerateCommandLine(), commandLine...)
 	}
-	// prefix options
-	commandLine = append(strings.Split(fmt.Sprintf("rkt run --local-config=%s --dns=host", configPath), " "), commandLine...)
+
+	// prefix hostsEntries
+	for _, entry := range hostsEntries {
+		commandLine = append(entry.GenerateCommandLine(), commandLine...)
+	}
+	// prefix TODO: we want to allow settings for these
+	commandLine = append(strings.Split(fmt.Sprintf("rkt run --trust-keys-from-https=true --insecure-options=tls --local-config=%s --dns=host", configPath), " "), commandLine...)
 
 	logger.Println(commandLine)
 	// set up our command run
@@ -201,7 +223,7 @@ func (container *Container) handleOutput(scanner *bufio.Scanner, source string, 
 }
 
 // getCommandLine will generate rkt cli commands for this container
-func (container *Container) getCommandLine(projectName string, logger *log.Logger) ([]string, error) {
+func (container *Container) getCommandLine(projectName string, runningPods rkt.Pods, logger *log.Logger) ([]string, error) {
 	// generate the different components
 	command := make([]string, 0)
 
@@ -242,12 +264,6 @@ func (container *Container) getCommandLine(projectName string, logger *log.Logge
 		mountArray = append(mountArray, mount.GenerateCommandLine()...)
 	}
 
-	// add in hosts information
-	// get a list of running Pods
-	runningPods, err := rkt.GetRunningPods(projectName)
-	if err != nil {
-		return command, err
-	}
 	depIPMap, err := container.GetDepChainIPs(projectName, runningPods, logger)
 	if err != nil {
 		return command, err
@@ -286,14 +302,13 @@ func (container *Container) GetDepChainIPs(projectName string, runningPods rkt.P
 		// get the appName for this depend
 		depAppName, err := rkt.GetAppName(projectName, name)
 		if err != nil {
-			return make(map[string][]string), err
+			return depIPMap, err
 		}
 
-		// check if the pod is running, and if it is, grab the ip
+		// check if there is a running pod, and if it is, grab the ip
 		if _, ok := runningPods.Pods[depAppName]; ok {
 			for _, network := range runningPods.Pods[depAppName].Networks {
 				depIPMap[name] = append(depIPMap[name], network.IP)
-				color.Red(fmt.Sprintf("%s - %s - %s", name, depAppName, network.IP))
 			}
 		} else {
 			logger.Printf("Required dependency %s is not running.  Assuming that's ok...\n", name)
@@ -301,7 +316,7 @@ func (container *Container) GetDepChainIPs(projectName string, runningPods rkt.P
 		// run on each dependency so we get a full set of heirachical IPs
 		depDepIPMap, err := depContainer.GetDepChainIPs(projectName, runningPods, logger)
 		if err != nil {
-			return make(map[string][]string), err
+			return depIPMap, err
 		}
 		// merge our maps
 		for name, value := range depDepIPMap {

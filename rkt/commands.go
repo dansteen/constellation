@@ -10,7 +10,7 @@ import (
 
 // Pods stores a number of pods indexed by their appName
 type Pods struct {
-	Pods map[string]*Pod
+	Pods map[string]Pod
 }
 
 // GetRunningPods will get a list of running pods that are relevant to the provided project, and will return their information indexed by
@@ -19,9 +19,7 @@ func GetRunningPods(projectName string) (Pods, error) {
 	// create a type to hold our pods
 	allPods := make([]Pod, 0)
 	// hold our running pods for this project
-	ourPods := Pods{
-		Pods: make(map[string]*Pod),
-	}
+	ourPods := make(map[string]Pod)
 
 	// get all the pods
 	command := strings.Split("rkt list --format=json", " ")
@@ -41,13 +39,12 @@ func GetRunningPods(projectName string) (Pods, error) {
 			// and then filter again on the ones for our project
 			for _, name := range pod.AppNames {
 				if strings.HasPrefix(name, fmt.Sprintf("%s-", projectName)) {
-					ourPods.Pods[name] = &pod
+					ourPods[name] = pod
 				}
 			}
 		}
 	}
-	return ourPods, nil
-
+	return Pods{Pods: ourPods}, nil
 }
 
 // GetAppName will generate the app name for this container/project combination
