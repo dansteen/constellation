@@ -46,28 +46,37 @@ func (monitor *FileMonitorCondition) UnmarshalJSON(b []byte) error {
 func (monitor *FileMonitorCondition) Handle(results chan<- error, stop <-chan bool, logger *log.Logger) {
 	logger.Printf("Monitoring %s for %s\n", monitor.File, monitor.Regex.String())
 
-	// tail our file
-	tail, err := tail.TailFile(monitor.File, tail.Config{Follow: true, ReOpen: true, MustExist: false, Logger: tail.DiscardingLogger})
+	// tail our file. We seek to the end first
+	tail, err := tail.TailFile(monitor.File, tail.Config{
+		Follow:    true,
+		ReOpen:    true,
+		MustExist: false,
+		Location: &tail.SeekInfo{
+			Offset: 0,
+			Whence: 2,
+		},
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// then check for our regexs
-	for line := range tail.Lines {
-		// if we get signalled that we are done we also exit
+	for {
 		select {
 		case <-stop:
-			fmt.Printf("Cancelled Monitoring %s for %s\n", monitor.File, monitor.Regex.String())
+			logger.Printf("Cancelled Monitoring %s for %s\n", monitor.File, monitor.Regex.String())
+			tail.Stop()
 			return
-		default:
+		case line := <-tail.Lines:
 			if monitor.Regex.Match([]byte(line.Text)) == true {
-				logger.Printf("%s matched %s.\n", monitor.File, monitor.Regex.String())
 				if monitor.Status == "success" {
+					logger.Printf("%s matched %s. Success.\n", monitor.File, monitor.Regex.String())
 					results <- nil
 				}
 				if monitor.Status == "failure" {
 					results <- errors.New(fmt.Sprintf("%s matched %s. Specified as failure\n", monitor.File, monitor.Regex.String()))
 				}
+				// stop tailing
+				tail.Stop()
 				return
 			}
 		}

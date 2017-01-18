@@ -58,10 +58,21 @@ func (config Config) Merge(newConfig Config) Config {
 	for name, container := range newConfig.Containers {
 		// make sure we arent overwriting existing values
 		if _, ok := config.Containers[name]; ok {
-			fmt.Printf("Already seen container %s.  Ignoring second instance.", name)
+			fmt.Printf("Already seen container %s.  Ignoring second instance\n", name)
 		} else {
 			// do the merge
 			config.Containers[name] = container
+		}
+	}
+
+	// run through new volumes
+	for name, volume := range newConfig.Volumes {
+		// make sure we arent overwriting existing values
+		if _, ok := config.Volumes[name]; ok {
+			fmt.Printf("Already seen Volume %s.  Ignoring second instance\n", name)
+		} else {
+			// do the merge
+			config.Volumes[name] = volume
 		}
 	}
 

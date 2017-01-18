@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/dansteen/constellation/util"
 	//"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // runCmd represents the run command
@@ -53,19 +55,35 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	configPath := fmt.Sprintf("/tmp/constellation-%d", os.Getpid())
-	fmt.Println("run called")
+	log.Println("run called")
+	BaseInit()
+	// grab some config items
+	projectName := viper.GetString("projectName")
+	netConfigPath := viper.GetString("netConfigPath")
+	constellationFile := viper.GetString("constellationFile")
+	includeDirs := viper.GetStringSlice("includeDirs")
+	imageOverrides := viper.GetStringSlice("imageOverrides")
+	volumeOverrides := viper.GetStringSlice("volumeOverrides")
+	hostsEntries := viper.GetStringSlice("hostsEntries")
+
 	// generate our network file
-	network, err := types.NewNetworkConfig(projectName)
-	util.Check(err)
-	// convert our config to json
-	networkJSON, err := json.MarshalIndent(network, "", "  ")
-	// make our config folder
-	util.Check(os.MkdirAll(fmt.Sprintf("%s/net.d", configPath), 0755))
-	// write our network files
-	util.Check(ioutil.WriteFile(fmt.Sprintf("%s/net.d/%s.conf", configPath, projectName), networkJSON, 0644))
+	netConfigFile := fmt.Sprintf("%s/net.d/%s.conf", netConfigPath, projectName)
+	// first check if we already have a config file for this project
+	if _, err := os.Stat(netConfigFile); os.IsNotExist(err) {
+		network, err := types.NewNetworkConfig(projectName)
+		util.Check(err)
+		// convert our config to json
+		networkJSON, err := json.MarshalIndent(network, "", "  ")
+		// make our config folder
+		util.Check(os.MkdirAll(fmt.Sprintf("%s/net.d", netConfigPath), 0755))
+		// write our network files
+		util.Check(ioutil.WriteFile(netConfigFile, networkJSON, 0644))
+	} else {
+		log.Printf("Using config from previous project run: %s", netConfigPath)
+	}
+
 	// process our configs
-	configData := config.ProcessFile(podFile, includeDirs)
+	configData := config.ProcessFile(constellationFile, includeDirs)
 
 	// handle image overrides passed into the command line.
 	imageRE := regexp.MustCompile("(:^|[^/]*/)?([^:]*):?(.*)")
@@ -120,7 +138,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	// initialize the containers
 	for _, container := range configData.Containers {
-		util.Check(container.Init(configData.Containers))
+		util.Check(container.Init(configData.Containers, configData.Volumes))
 	}
 
 	// make sure to create our log volumes
@@ -133,14 +151,18 @@ func run(cmd *cobra.Command, args []string) {
 	util.Check(err)
 	//spew.Dump(configData)
 
+	// print out the execution order
+	log.Println("Will start containers in the following order:")
+	for _, name := range order {
+		log.Printf("\t%s\n", name)
+	}
+
 	for _, containerName := range order {
 		// grab our container
 		container := configData.Containers[containerName]
 		// run our container
-		err := container.Run(configPath, projectName, configData.Volumes, customHosts)
+		err := container.Run(netConfigPath, projectName, configData.Volumes, customHosts)
 		util.Check(err)
 
 	}
-
-	fmt.Println(order)
 }

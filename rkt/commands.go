@@ -13,9 +13,8 @@ type Pods struct {
 	Pods map[string]Pod
 }
 
-// GetRunningPods will get a list of running pods that are relevant to the provided project, and will return their information indexed by
-// the appName
-func GetRunningPods(projectName string) (Pods, error) {
+// GetAllPods will return a list of all pods in rkt
+func GetAllPods(projectName string) (Pods, error) {
 	// create a type to hold our pods
 	allPods := make([]Pod, 0)
 	// hold our running pods for this project
@@ -33,18 +32,32 @@ func GetRunningPods(projectName string) (Pods, error) {
 		return Pods{}, err
 	}
 
-	// filter on the running ones
+	// filter on the ones for our project
 	for _, pod := range allPods {
-		if pod.State == "running" {
-			// and then filter again on the ones for our project
-			for _, name := range pod.AppNames {
-				if strings.HasPrefix(name, fmt.Sprintf("%s-", projectName)) {
-					ourPods[name] = pod
-				}
+		for _, name := range pod.AppNames {
+			if strings.HasPrefix(name, fmt.Sprintf("%s-", projectName)) {
+				ourPods[name] = pod
 			}
 		}
 	}
 	return Pods{Pods: ourPods}, nil
+}
+
+// GetRunningPods will get a list of running pods that are relevant to the provided project, and will return their information indexed by
+// the appName
+func GetRunningPods(projectName string) (Pods, error) {
+	// grab our pods
+	pods, err := GetAllPods(projectName)
+	if err != nil {
+		return Pods{}, err
+	}
+	// strip out our running pods
+	for name, pod := range pods.Pods {
+		if pod.State != "running" {
+			delete(pods.Pods, name)
+		}
+	}
+	return pods, nil
 }
 
 // GetAppName will generate the app name for this container/project combination

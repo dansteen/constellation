@@ -31,14 +31,29 @@ type Container struct {
 
 // Init will do the inital checking of a container to make sure it's viable.  We can also do initial container setup here if
 // if we want (though we don't right now)
-func (container *Container) Init(containers map[string]*Container) error {
-	// make sure that any filemonitors reference volumes that are mounted from the filesystem.  Otherwie the filemonitor will
+func (container *Container) Init(containers map[string]*Container, volumes map[string]Volume) error {
+
+	// Make sure that any mounts reference defined volumes
+	for _, mount := range container.Mounts {
+		if _, ok := volumes[mount.Volume]; !ok {
+			return errors.New(fmt.Sprintf("Mount in %s referenced volume %s which is not defined", container.Name, mount.Volume))
+		}
+	}
+
+	// make sure that any filemonitors reference paths that are mounted from the filesystem.  Otherwie the filemonitor will
 	// never trigger since it runs outside of the container
-	for _, condition := range container.StateConditions.FileMonitors {
+	for index, condition := range container.StateConditions.FileMonitors {
 		found := false
 		for _, mount := range container.Mounts {
 			if strings.HasPrefix(condition.File, mount.Path) {
 				found = true
+				// replace the prefix with the respective local path
+				localPath := strings.Replace(condition.File, mount.Path, volumes[mount.Volume].Path, 1)
+				container.StateConditions.FileMonitors[index] = state.FileMonitorCondition{
+					File:   localPath,
+					Regex:  condition.Regex,
+					Status: condition.Status,
+				}
 			}
 		}
 		if found == false {
@@ -106,7 +121,7 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 		commandLine = append(entry.GenerateCommandLine(), commandLine...)
 	}
 	// prefix TODO: we want to allow settings for these
-	commandLine = append(strings.Split(fmt.Sprintf("rkt run --trust-keys-from-https=true --insecure-options=tls --local-config=%s --dns=host", configPath), " "), commandLine...)
+	commandLine = append(strings.Split(fmt.Sprintf("rkt run --trust-keys-from-https=true --insecure-options=all-fetch --local-config=%s --dns=host", configPath), " "), commandLine...)
 
 	logger.Println(commandLine)
 	// set up our command run
@@ -126,7 +141,9 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	// handle log monitors if set (must happen before command is started)
 	if len(container.StateConditions.FileMonitors) > 0 {
 		for _, monitor := range container.StateConditions.FileMonitors {
-			go monitor.Handle(status, stop, logger)
+			go func(monitor state.FileMonitorCondition, status chan error, stop chan bool, logger *log.Logger) {
+				monitor.Handle(status, stop, logger)
+			}(monitor, status, stop, logger)
 		}
 	}
 
@@ -311,7 +328,13 @@ func (container *Container) GetDepChainIPs(projectName string, runningPods rkt.P
 				depIPMap[name] = append(depIPMap[name], network.IP)
 			}
 		} else {
-			logger.Printf("Required dependency %s is not running.  Assuming that's ok...\n", name)
+			// if there is not, check the pod to make sure that it was allowed to exit
+			if container.DependsOn[name].StateConditions.Exit != nil && container.DependsOn[name].StateConditions.Exit.Status == "success" {
+				logger.Printf("Required dependency %s is not running.  Looks like it is allowed to exit so we are ignoring. \n", name)
+			} else {
+				logger.Printf("Required dependency %s is not running.  No valid exit state.  Failing. \n", name)
+				return depIPMap, errors.New(fmt.Sprintf("Required dependency %s is not running", name))
+			}
 		}
 		// run on each dependency so we get a full set of heirachical IPs
 		depDepIPMap, err := depContainer.GetDepChainIPs(projectName, runningPods, logger)
