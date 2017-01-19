@@ -3,6 +3,7 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -71,4 +72,18 @@ func GetAppName(projectName string, containerName string) (string, error) {
 	appName := reg.ReplaceAllString(containerName, "")
 	appName = fmt.Sprintf("%s-%s", projectName, appName)
 	return appName, nil
+}
+
+// Fetch will fetch a rkt image
+func Fetch(image string) error {
+	log.Printf("Fetching image: %s", image)
+	// fetch our pod
+	command := strings.Split(fmt.Sprintf("rkt fetch --insecure-options=all-fetch --trust-keys-from-https=true %s", image), " ")
+	listCmd := exec.Command(command[0], command[1:]...)
+	output, err := listCmd.Output()
+	// if there is an error, print the output
+	if err != nil {
+		log.Printf("%s", output)
+	}
+	return err
 }

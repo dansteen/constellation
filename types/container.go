@@ -29,8 +29,8 @@ type Container struct {
 	DependsOn       map[string]*Container
 }
 
-// Init will do the inital checking of a container to make sure it's viable.  We can also do initial container setup here if
-// if we want (though we don't right now)
+// Init will do the inital checking of a container to make sure it's viable.  We also pull the images.
+// We can also do initial container setup here if we want (though we don't right now)
 func (container *Container) Init(containers map[string]*Container, volumes map[string]Volume) error {
 
 	// Make sure that any mounts reference defined volumes
@@ -73,8 +73,9 @@ func (container *Container) Init(containers map[string]*Container, volumes map[s
 	}
 	container.DependsOn = depends
 
-	// if we have not exited we return
-	return nil
+	// pull our image and return
+	err := rkt.Fetch(container.Image)
+	return err
 }
 
 // Run will run a container.  It will return an error message if the container fails by any of the containers StateConditions
@@ -121,7 +122,7 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 		commandLine = append(entry.GenerateCommandLine(), commandLine...)
 	}
 	// prefix TODO: we want to allow settings for these
-	commandLine = append(strings.Split(fmt.Sprintf("rkt run --trust-keys-from-https=true --insecure-options=all-fetch --local-config=%s --dns=host", configPath), " "), commandLine...)
+	commandLine = append(strings.Split(fmt.Sprintf("rkt run --local-config=%s --dns=host", configPath), " "), commandLine...)
 
 	logger.Println(commandLine)
 	// set up our command run
