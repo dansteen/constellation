@@ -1,5 +1,5 @@
 # constellation
-Constellation is a tool to spin up a "constellation" of rkt pods (see what I did there) in a controlled fashion.   It allows you to specify a list of containers to spin up, their success or failure conditions, and their interdependencies such that dependent containers are not spun up until the containers they depend on have encountered a "success" condition.  Constellation will also ensure that networking is set up between the containers so that dependent containers can talk to their dependencies.
+Constellation is a tool to spin up a "constellation" of rkt pods (see what I did there?) in a controlled fashion.   It allows you to specify a list of containers to spin up, their success or failure conditions, and their interdependencies such that dependent containers are not spun up until the containers they depend on have encountered a "success" condition.  Constellation will also ensure that networking is set up between the containers so that dependent containers can talk to their dependencies.
 
 # Examples
 These examples go in ascending order of complexity.
@@ -144,7 +144,7 @@ containers:
         duration: 300
         status: failure
 ```
-This will start the application, and monitor the file `/var/log/api/api_application.log` for success and failure strings.   If it does not find one in 300 seconds it will register the application as having failed.   To understand the above config, it is important to realize that *file monitoring is done by Constellation outside of the container*.   This means that you have to first export the directory that contains the file you want to monitor.   The stanza:
+This will start the application, and monitor the file `/var/log/api/api_application.log` for success and failure strings.   If it does not find one in 300 seconds it will register the application as having failed.   To understand the above config, it is important to realize that **file monitoring is done by Constellation outside of the container**.   This means that you have to first export the directory that contains the file you want to monitor.   The stanza:
 ```yaml
 mounts:
  - volume: app-log-dir
@@ -242,8 +242,8 @@ These Stanzas are available when defining containers:
 
 | Parameter | Values | Description | Required |
 | --------- | ------ | ----------- | -------- |
-| image | <image_path> | The path to the image to use for this container.  Can be overriden by -i. | Yes |
-| exec  | <command> | The command to run inside the container. If left out will run the default container command. | No |
+| image | `<image_path>` | The path to the image to use for this container.  Can be overriden by -i. | Yes |
+| exec  | `<command>` | The command to run inside the container. If left out will run the default container command. | No |
 | environment | Hash of environment values `ENV:value` | The environment values to pass into the container | No |
 | mounts | See Below | A list of mount definitons for this container. | No |
 | state_conditions | See Below | A hash of state conditions to determin success or failure for this container | No |
@@ -254,8 +254,8 @@ Mounts are used to mount folders on host machine into the container.  These stan
 
 | Parameters | Values | Description | Required |
 | ---------- | ------ | ----------- | -------- |
-| volume | <volume_name> | The name of the volume (as defined above) to mount | Yes |
-| path | <path> | the path inside the container to mount `volume` on | 
+| volume | `<volume_name>` | The name of the volume (as defined above) to mount | Yes |
+| path | `<path>` | the path inside the container to mount `volume` on | 
 
 ##### State Conditions
 State conditions are used to determin if a container has come up sucesfully or not.  There are several types of state conditions that we support:
@@ -265,7 +265,7 @@ This state condition will trigger after a certain amount of time has passed. It 
 
 | Parameters | Values | Description | Required |
 | ---------- | ------ | ----------- | -------- |
-| duration | <int> | The number of seconds to wait prior to triggering | Yes |
+| duration | `<int>` | The number of seconds to wait prior to triggering | Yes |
 | status | `success` \| `failure` | The result to return if this state condition triggers | Yes
 
 ###### exit
@@ -273,7 +273,7 @@ This state condition will trigger when the container exits.   Note that, if no e
 
 | Parameters | Values | Description | Required |
 | ---------- | ------ | ----------- | -------- |
-| codes | [ <int> ] | Expects an array of exit codes.  These are the codes that will trigger the result defined in `status` | Yes |
+| codes | `[ <int> ]` | Expects an array of exit codes.  These are the codes that will trigger the result defined in `status` | Yes |
 | status | `success` \| `failure` | The result to return if the container exits with one of `codes`.  If any other exit code is returned the other status will be returned. | Yes |
 
 ###### output
@@ -290,7 +290,7 @@ This state condition will monitor the named files for the supplied Regex, and tr
 
 | Parameters | Values | Description | Required |
 | ---------- | ------ | ----------- | -------- |
-| file | <file_path> | The file path to monitor.  **Note that this is the path to the file inside the container**. | Yes |
+| file | `<file_path>` | The file path to monitor.  **Note that this is the path to the file inside the container**. | Yes |
 | regex | /regex/ | The regex to look for | Yes |
 | status | `success`\|`failuire` | The status to return when `regex` is found | Yes |
 
