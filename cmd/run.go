@@ -163,6 +163,12 @@ func run(cmd *cobra.Command, args []string) {
 		// run our container
 		err := container.Run(netConfigPath, projectName, configData.Volumes, customHosts)
 		util.Check(err)
+	}
 
+	// after we have brought everything up we print out connection information
+	for name, container := range configData.Containers {
+		for _, port := range container.Ports {
+			fmt.Printf("%s/%s:%d", name, port.Name, port.HostPort)
+		}
 	}
 }

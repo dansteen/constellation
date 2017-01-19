@@ -18,7 +18,7 @@ type Port struct {
 func (port *Port) GenerateCommandLine() []string {
 	portArray := make([]string, 2)
 	portArray[0] = "--port"
-	portArray[1] = fmt.Sprintf("%s:%s", port.Name, port.HostPort)
+	portArray[1] = fmt.Sprintf("%s:%d", port.Name, port.HostPort)
 	return portArray
 }
 
@@ -27,17 +27,27 @@ func (port *Port) GenerateCommandLine() []string {
 func (port *Port) SetHostPort() error {
 	// get an open port
 	if strings.HasPrefix(port.Protocol, "tcp") {
-		addr, err := net.ResolveTCPAddr(port.Protocol, "localhost:0")
+		addr, err := net.ResolveTCPAddr(port.Protocol, "0.0.0.0:0")
 		if err != nil {
 			return err
 		}
-		port.HostPort = addr.Port
+		conn, err := net.ListenTCP("tcp", addr)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		port.HostPort = conn.Addr().(*net.TCPAddr).Port
 	} else if strings.HasPrefix(port.Protocol, "udp") {
-		addr, err := net.ResolveUDPAddr(port.Protocol, "localhost:0")
+		addr, err := net.ResolveUDPAddr(port.Protocol, "0.0.0.0:0")
 		if err != nil {
 			return err
 		}
-		port.HostPort = addr.Port
+		conn, err := net.ListenUDP("upd", addr)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		port.HostPort = conn.LocalAddr().(*net.UDPAddr).Port
 	}
 	return nil
 }
