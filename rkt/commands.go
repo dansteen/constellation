@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 // Pods stores a number of pods indexed by their appName
@@ -74,8 +76,8 @@ func GetAppName(projectName string, containerName string) (string, error) {
 	return appName, nil
 }
 
-// Fetch will fetch a rkt image
-func Fetch(image string) error {
+// Fetch will fetch a rkt image and return the image hash
+func Fetch(image string) (string, error) {
 	log.Printf("Fetching image: %s", image)
 	// fetch our pod
 	command := strings.Split(fmt.Sprintf("rkt fetch --insecure-options=all-fetch --trust-keys-from-https=true %s", image), " ")
@@ -85,5 +87,27 @@ func Fetch(image string) error {
 	if err != nil {
 		log.Printf("%s", output)
 	}
-	return err
+	return strings.TrimSpace(string(output)), err
+}
+
+// GetImageManifest will get the manifest for an image that has been fetched
+// it returns the manifest mapped to a generic interface
+func GetImageManifest(image string) (*ImageManifest, error) {
+	// setup an object to hold our ImageManifest
+	imageManifest := ImageManifest{}
+	// grab our manifest in json
+	command := strings.Split(fmt.Sprintf("rkt image cat-manifest %s", image), " ")
+	listCmd := exec.Command(command[0], command[1:]...)
+	output, err := listCmd.Output()
+	// if there is an error, print the output
+	if err != nil {
+		log.Printf("%s", output)
+		return &imageManifest, err
+	}
+	// otherwise we unmarshal and return the manifest
+	err = yaml.Unmarshal(output, &imageManifest)
+	if err != nil {
+		return &imageManifest, err
+	}
+	return &imageManifest, nil
 }

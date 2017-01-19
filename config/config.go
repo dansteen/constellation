@@ -6,24 +6,25 @@ import (
 
 	"encoding/json"
 
+	"github.com/dansteen/constellation/container"
 	"github.com/dansteen/constellation/types"
 	"github.com/twmb/algoimpl/go/graph"
 )
 
 // Config holds the config in a file
 type Config struct {
-	Containers map[string]*types.Container `json:"containers"`
-	Requires   []string                    `json:"require"`
-	Volumes    map[string]types.Volume     `json"volumes"`
+	Containers map[string]*container.Container `json:"containers"`
+	Requires   []string                        `json:"require"`
+	Volumes    map[string]types.Volume         `json"volumes"`
 }
 
 // UnmarshalJSON
 func (config *Config) UnmarshalJSON(b []byte) error {
 	// create a struct to unmarshal into
 	type TempConfig struct {
-		Containers map[string]*types.Container `json:"containers"`
-		Requires   []string                    `json:"require"`
-		Volumes    map[string]types.Volume     `json"volumes"`
+		Containers map[string]*container.Container `json:"containers"`
+		Requires   []string                        `json:"require"`
+		Volumes    map[string]types.Volume         `json"volumes"`
 	}
 	var tempConfig TempConfig
 	// unmarshal our items into the container

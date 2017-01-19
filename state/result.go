@@ -1,7 +1,7 @@
-package types
+package state
 
 // Result holds information about the result of a state condition
-type StateConditionResult struct {
+type Result struct {
 	Error   error
 	Success bool
 }

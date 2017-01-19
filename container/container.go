@@ -1,5 +1,5 @@
-// types stores objects of various types and the functions to interact with them
-package types
+// container stores objects related to containers
+package container
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/dansteen/constellation/rkt"
 	"github.com/dansteen/constellation/state"
+	"github.com/dansteen/constellation/types"
 	"github.com/dansteen/constellation/util"
 	//"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/color"
@@ -20,6 +21,7 @@ import (
 // Container stores all the information about a container to operate on
 type Container struct {
 	Name            string
+	ImageHash       string
 	Image           string                `json:"image"`
 	Environment     map[string]string     `json:"environment"`
 	Exec            string                `json:"exec"`
@@ -27,11 +29,12 @@ type Container struct {
 	Mounts          []Mount               `json:"mounts"`
 	DependsStrings  []string              `json:"depends_on"`
 	DependsOn       map[string]*Container
+	Ports           []Port
 }
 
 // Init will do the inital checking of a container to make sure it's viable.  We also pull the images.
 // We can also do initial container setup here if we want (though we don't right now)
-func (container *Container) Init(containers map[string]*Container, volumes map[string]Volume) error {
+func (container *Container) Init(containers map[string]*Container, volumes map[string]types.Volume) error {
 
 	// Make sure that any mounts reference defined volumes
 	for _, mount := range container.Mounts {
@@ -73,13 +76,32 @@ func (container *Container) Init(containers map[string]*Container, volumes map[s
 	}
 	container.DependsOn = depends
 
-	// pull our image and return
-	err := rkt.Fetch(container.Image)
-	return err
+	// pull our image
+	imageHash, err := rkt.Fetch(container.Image)
+	if err != nil {
+		return err
+	}
+	container.ImageHash = imageHash
+
+	// initialize our port list
+	container.Ports = make([]Port, 0)
+	// grab our image manifest (we use the hash hear because cat-manifest doesn't like docker images
+	imageManifest, err := rkt.GetImageManifest(container.ImageHash)
+	if err != nil {
+		log.Printf("Could not get manifest of image: %s", container.ImageHash)
+		return err
+	}
+	// and add the ports to our container
+	for _, manifestPort := range imageManifest.App.Ports {
+		container.Ports = append(container.Ports, Port{ImageAppPort: manifestPort})
+	}
+
+	return nil
+
 }
 
 // Run will run a container.  It will return an error message if the container fails by any of the containers StateConditions
-func (container *Container) Run(configPath string, projectName string, volumes map[string]Volume, hostsEntries []HostsEntry) error {
+func (container *Container) Run(configPath string, projectName string, volumes map[string]types.Volume, hostsEntries []types.HostsEntry) error {
 	// set up logging for this run
 	colors := util.RandomColor()
 	ourColor := color.New(colors...).SprintfFunc()
@@ -109,7 +131,7 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	// get our command line
 	commandLine, err := container.getCommandLine(projectName, runningPods, logger)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// prefix volumes
@@ -121,6 +143,17 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	for _, entry := range hostsEntries {
 		commandLine = append(entry.GenerateCommandLine(), commandLine...)
 	}
+
+	// prefix our port maps
+	for _, entry := range container.Ports {
+		// we do this as close to execution as possible to avoid conflicts
+		err = entry.SetHostPort()
+		if err != nil {
+			return err
+		}
+		commandLine = append(entry.GenerateCommandLine(), commandLine...)
+	}
+
 	// prefix TODO: we want to allow settings for these
 	commandLine = append(strings.Split(fmt.Sprintf("rkt run --local-config=%s --dns=host", configPath), " "), commandLine...)
 
