@@ -5,7 +5,7 @@ Constellation is a tool to spin up a "constellation" of rkt pods (see what I did
 These examples go in ascending order of complexity.
 ## A Simple Application
 The simplest invocation would spin up a single application and use the default command baked into the container:
-```
+```yaml
 api.app.local:
     image: aci-repo.example.com/api:af457b220597aa34b739bff13afc514ba72e8100
 ```
@@ -13,7 +13,7 @@ You would then run this using `sudo ./constellation run -c api.yml` and a single
 
 ## A Simple Applications with some conditions
 Lets add in some success and failure conditions
-```
+```yaml
 containers:
   api.app.local:
     image: aci-repo.example.com/api:af457b220597aa34b739bff13afc514ba72e8100
@@ -33,7 +33,7 @@ This tells constellation to run the container with the default command, but also
 
 ## An application and its database
 Now lets say our application requires a database. We can set that up as follows:
-```
+```yaml
 containers:
   db.local:
     image: docker://postgres:9.6
@@ -69,7 +69,7 @@ This will spin up a postgres container, and monitor it for a success string.  If
 
 ## An application and its database and some database config
 A common need is to prep a database via migration scripts or similar.   This can be done as well:
-```
+```yaml
 containers:
   db.local:
     image: docker://postgres:9.6
@@ -117,7 +117,7 @@ This will spin up a postgres db, and then run migration scripts against it.  Con
 
 ## Monitoring log files for state_conditions
 It is also possible to monitor log files for regex, and use the results in state conditions:
-```
+```yaml
 volumes:
   app-log-dir:
     kind: host
@@ -145,13 +145,13 @@ containers:
         status: failure
 ```
 This will start the application, and monitor the file `/var/log/api/api_application.log` for success and failure strings.   If it does not find one in 300 seconds it will register the application as having failed.   To understand the above config, it is important to realize that *file monitoring is done by Constellation outside of the container*.   This means that you have to first export the directory that contains the file you want to monitor.   The stanza:
-```
+```yaml
 mounts:
  - volume: app-log-dir
    path: /var/log/api
 ```
 tells rkt that you want to mount the external volume named `app-log-dir` into the container at the path `/var/log/api`.   Then, the stanzas:
-```
+```yaml
 volumes:
   app-log-dir:
     kind: host
@@ -164,7 +164,7 @@ define the `app-log-dir` volume and tell rkt which external folder to use when t
 
 ## Spreading config across multiple files
 It is common to have multiple applications that depend on each other.  We don't want to have to keep all of our config together, and we don't want to have to redefine the same config more than once.   Constellation allows the importing of other constellation configs:
-```
+```yaml
 require:
   - postgres.yml
 
@@ -200,9 +200,9 @@ Constellation can be invoked with the following commands:
 
 The following flags are supported:
 
-| Flag | Description | Required
-| ------------- | ------------- | --------
-| -c | Path to the constellation config file that defines your applications | yes
+| Flag | Name | Description | Required
+| ---- | ---- | ----------- | --------
+| -c | Constellation Config | Path to the constellation config file that defines your applications | yes
 | -p | Project Name | A unique name for this invocation.  Containers started are tagged with this name, and this is used to `stop` and `clean` the containers | yes
 | -H | Hosts Entries | Extra entries for the /etc/hosts file in all containers.  Useful for external resources | no
 | -i | Image Overrides | Overrides the versions of images in the config file | no
@@ -213,15 +213,15 @@ The following flags are supported:
 The following config Stanzas are supported:
 
 ### Base Config
+The following base stanzas are supported.  See below for more information about each of them.
+
 | Stanza | Parameters | Values | Description | Example |
 | ------ | ---------- | ------ | ----------- | ------- |
-| require || a list of constellation config files | File names provided here will be processed along with (prior to) the config file that includes them. Note that only filenames should be here not full paths.  Paths to files must be included in the `-I` CLI flag unless the file is in the same directory as the file that is calling it. | 
-```
+| require || a list of constellation config files | File names provided here will be processed along with (prior to) the config file that includes them. Note that only filenames should be here not full paths.  Paths to files must be included in the `-I` CLI flag unless the file is in the same directory as the file that is calling it. | ```yaml
 require:
   - postgres.yml
 ``` |
-| volumes || a hash of `volume_name: parameters` for mounting into containers | Volumes named here can be referenced in the `mounts` stanza of the container definition.  They can also be overriden using the `-v` flag. | 
-```
+| volumes || a hash of `volume_name: parameters` for mounting into containers | Volumes named here can be referenced in the `mounts` stanza of the container definition.  They can also be overriden using the `-v` flag. | ```yaml
 volumes:
   log-dir:
     kind: host
