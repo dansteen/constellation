@@ -40,7 +40,7 @@ containers:
     environment:
       POSTGRES_USER: appuser
       POSTGRES_DB: scratch
-      POSTGRES_PASSWORD: dev_password_1234
+      POSTGRES_PASSWORD: password
     state_conditions:
       output:
         - source: STDOUT
@@ -76,7 +76,7 @@ containers:
     environment:
       POSTGRES_USER: appuser
       POSTGRES_DB: scratch
-      POSTGRES_PASSWORD: dev_password_1234
+      POSTGRES_PASSWORD: password
     state_conditions:
       output:
         - source: STDOUT
@@ -207,7 +207,7 @@ The following flags are supported:
 | -H | Hosts Entries | Extra entries for the /etc/hosts file in all containers.  Useful for external resources | no
 | -i | Image Overrides | Overrides the versions of images in the config file | no
 | -I | Include Directories | Directories to search for config files included using the `require` stanza | no
-| -v | Volume Overrides | Overide the volumes defined in the config file | no
+| -v | Volume Overrides | Overide the volumes defined in the config file. Must be an absolute path. | no
 
 ## Config Stanzas
 The following config Stanzas are supported:
@@ -215,39 +215,152 @@ The following config Stanzas are supported:
 ### Base Config
 The following base stanzas are supported.  See below for more information about each of them.
 
-| Stanza | Parameters | Values | Description | Example |
-| ------ | ---------- | ------ | ----------- | ------- |
-| require || a list of constellation config files | File names provided here will be processed along with (prior to) the config file that includes them. Note that only filenames should be here not full paths.  Paths to files must be included in the `-I` CLI flag unless the file is in the same directory as the file that is calling it. | ```yaml
+| Stanza | Description | 
+| ------ | ----------- |
+| require | A list of constellation config files. File names provided here will be processed along with (prior to) the config file that includes them. Note that only filenames should be here not full paths.  Paths to files must be included in the `-I` CLI flag unless the file is in the same directory as the file that is calling it. |
+| volumes | A hash of volume names.  Volumes named here can be referenced in the `mounts` stanza of the container definition and mounted into containers.  They can also be overriden using the `-v` flag. |
+| containers | A hash of container definitions. The base stanza for our container definitions. |
+
+
+#### Require
+This is a list of config files to include.
+
+#### Volumes
+A hash of volume definitions.
+
+| Parameter | Values | Description | Required |
+| --------- | ------ | ----------- | -------- |
+| kind | `host` \| `empty` | The type of volume this should be.  Note that only type `host` can be used with filemonitor state_conditions. | yes |
+| path | `<filepath>` | the local path (external to the container) that you want to mount into the container | yes |
+| uid  | numeric <uid> | the uid to set as the owner of `path` | yes |
+| gid  | numeric <gid> | the gid to set as the owner of `path` | yes |
+| mode | octal <mode> | the permissions to apply to `path` | yes |
+
+
+#### Container Config
+These Stanzas are available when defining containers:
+
+| Parameter | Values | Description | Required |
+| --------- | ------ | ----------- | -------- |
+| image | <image_path> | The path to the image to use for this container.  Can be overriden by -i. | Yes |
+| exec  | <command> | The command to run inside the container. If left out will run the default container command. | No |
+| environment | Hash of environment values `ENV:value` | The environment values to pass into the container | No |
+| mounts | See Below | A list of mount definitons for this container. | No |
+| state_conditions | See Below | A hash of state conditions to determin success or failure for this container | No |
+| depends_on | List of container definition names | The containers that this container depends on. | No |
+
+##### Mounts
+Mounts are used to mount folders on host machine into the container.  These stanzas are available when defining mounts:
+
+| Parameters | Values | Description | Required |
+| ---------- | ------ | ----------- | -------- |
+| volume | <volume_name> | The name of the volume (as defined above) to mount | Yes |
+| path | <path> | the path inside the container to mount `volume` on | 
+
+##### State Conditions
+State conditions are used to determin if a container has come up sucesfully or not.  There are several types of state conditions that we support:
+
+###### timeout
+This state condition will trigger after a certain amount of time has passed. It expects a hash with the following parameters:
+
+| Parameters | Values | Description | Required |
+| ---------- | ------ | ----------- | -------- |
+| duration | <int> | The number of seconds to wait prior to triggering | Yes |
+| status | `success` \| `failure` | The result to return if this state condition triggers | Yes
+
+###### exit
+This state condition will trigger when the container exits.   Note that, if no exit state condition is defined then the container is not expected to exit, and any exit will trigger a failure. It expects a hash with the following parameters:
+
+| Parameters | Values | Description | Required |
+| ---------- | ------ | ----------- | -------- |
+| codes | [ <int> ] | Expects an array of exit codes.  These are the codes that will trigger the result defined in `status` | Yes |
+| status | `success` \| `failure` | The result to return if the container exits with one of `codes`.  If any other exit code is returned the other status will be returned. | Yes |
+
+###### output
+This state condition will monitor the output of the container and trigger if a Regex is found.  It expects a list of hashes containing the following parameters: 
+
+| Parameters | Values | Description | Required |
+| ---------- | ------ | ----------- | -------- |
+| source | `STDOUT`\|`STDERR` | The output to monitor | Yes |
+| regex | /regex/ | The regular expression to monitor the `source` for | Yes |
+| status | `success`\|`failure` | The status to return when `regex` is found | Yes |
+
+###### filemonitor
+This state condition will monitor the named files for the supplied Regex, and trigger if it is found.  Note that monitoring is done externally to the container, so any files must be exported via `mounts` and `volumes`.  It expects a list of hashes containting the following parameters:
+
+| Parameters | Values | Description | Required |
+| ---------- | ------ | ----------- | -------- |
+| file | <file_path> | The file path to monitor.  **Note that this is the path to the file inside the container**. | Yes |
+| regex | /regex/ | The regex to look for | Yes |
+| status | `success`\|`failuire` | The status to return when `regex` is found | Yes |
+
+### Full Config Example
+This is an example of how to use all of the above config stanzas.
+
+File 1: `/data/constellation_files/postgres.yml`
+```yaml
+containers:
+  db.local:
+    image: docker://postgres:9.6
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_DB: scratch
+      POSTGRES_PASSWORD: password
+    state_conditions:
+      output:
+        - source: STDOUT
+          regex: PostgreSQL init process complete; ready for start up.
+          status: success
+```
+File 2: `/data/api/api.yml`
+```yaml
 require:
   - postgres.yml
-``` |
-| volumes || a hash of `volume_name: parameters` for mounting into containers | Volumes named here can be referenced in the `mounts` stanza of the container definition.  They can also be overriden using the `-v` flag. | ```yaml
 volumes:
-  log-dir:
+  app-log-dir:
     kind: host
-    path: /tmp/logs
+    path: /tmp/app-logs
     uid: 9998
     gid: 9998
     mode: 0755
-``` |
-| | kind | `host` \| `empty` | The type of volume this should be.  Note that only type `host` can be used with filemonitor state_conditions. | |
-| | path | `<filepath>` | the local path (external to the container) that you want to mount into the container | |
-| | uid  | numeric <uid> | the uid to set as the owner of `path` | |
-| | gid  | numeric <gid> | the gid to set as the owner of `path` | |
-| | mode | octal <mode> | the permissions to apply to `path` | |
-| containers | | | A map of container definitions | The base stanza for our container definitions.  See below. | |
+containers:
+  api.app.local:
+    image: aci-repo.example.com/api:af457b220597aa34b739bff13afc514ba72e8100
+    exec: envar /opt/jdk/bin/java -jar /opt/api/api.jar server /etc/api-config.yml
+    environment:
+      DATABASE: db.local
+    mounts:
+      - volume: app-log-dir
+        path: /var/log/api
+    state_conditions:
+      filemonitor:
+        - file: /var/log/api/api_application.log
+          regex: "org.eclipse.jetty.server.Server | Started"
+          status: success
+        - file: /var/log/api/api_application.log
+          regex: ERROR
+          status: failure
+      timeout:
+        duration: 300
+        status: failure
+      exit:
+        codes [ 1, 2 ]
+        status: failure
+      output:
+        - source: STDOUT
+          regex: Running .* application@[a-z0-9]*
+          status: success
+        - source: STDERR
+          regex: Exited
+          status: failure
+    depends_on:
+      - db.local
+```
 
-### Container Config
-These Stanzas are available when defining containers
+This would then be run with the following invocation:
+`sudo constellation run -c /data/api/api.yml -I /data/constellation_files`
 
 
-
-
-
-# Notes
-mention that -v paths must be absolute paths not relative
-
-# Todo
 # Known Bugs
 - Setting a Volume with Kind to "empty" will result in constellation not being able to monitor the files referenced in those volumes, 
   but also not reporting an error
