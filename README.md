@@ -4,6 +4,11 @@ Constellation is a tool to spin up a "constellation" of rkt pods (see what I did
 # Networking
 Constellation creates a rkt "contained network" for each `projectName` (as defined below), and all containers run under that project are on the same "contained network" and have access to each other.   Ports specified in the container manifest will be exported to the local machine (via the --ports mechanism) and assigned a random port on the local machine.  These ports are printed out at the end of the constellation run. 
 
+# Requirements
+This application requires the following:
+- rkt version >= 1.21.0
+- the rkt binary in your $PATH
+
 # Examples
 These examples go in ascending order of complexity.
 ## A Simple Application
