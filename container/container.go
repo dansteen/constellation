@@ -29,7 +29,7 @@ type Container struct {
 	Mounts          []Mount               `json:"mounts"`
 	DependsStrings  []string              `json:"depends_on"`
 	DependsOn       map[string]*Container
-	Ports           []Port
+	Ports           []*Port
 }
 
 // Init will do the inital checking of a container to make sure it's viable.  We also pull the images.
@@ -84,7 +84,7 @@ func (container *Container) Init(containers map[string]*Container, volumes map[s
 	container.ImageHash = imageHash
 
 	// initialize our port list
-	container.Ports = make([]Port, 0)
+	container.Ports = make([]*Port, 0)
 	// grab our image manifest (we use the hash hear because cat-manifest doesn't like docker images
 	imageManifest, err := rkt.GetImageManifest(container.ImageHash)
 	if err != nil {
@@ -93,7 +93,7 @@ func (container *Container) Init(containers map[string]*Container, volumes map[s
 	}
 	// and add the ports to our container
 	for _, manifestPort := range imageManifest.App.Ports {
-		container.Ports = append(container.Ports, Port{ImageAppPort: manifestPort})
+		container.Ports = append(container.Ports, &Port{ImageAppPort: manifestPort})
 	}
 
 	return nil
@@ -197,6 +197,13 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	// handle exit conditions if set (must happen after the command is started)
 	if container.StateConditions.Exit != nil {
 		go container.StateConditions.Exit.Handle(command, status, stop, logger)
+	} else {
+		// if we don't have an exit handler, we build a default one to fail on any exit
+		exitHandler := state.ExitCondition{
+			Codes:  []int{-1},
+			Status: "success",
+		}
+		go exitHandler.Handle(command, status, stop, logger)
 	}
 
 	// we wait for one of our conditions to return if we have any

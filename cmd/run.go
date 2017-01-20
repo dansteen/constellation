@@ -167,8 +167,12 @@ func run(cmd *cobra.Command, args []string) {
 
 	// after we have brought everything up we print out connection information
 	for name, container := range configData.Containers {
-		for _, port := range container.Ports {
-			fmt.Printf("%s/%s:%d", name, port.Name, port.HostPort)
+		// we only print out infomration for containers that are not expected to exit
+		if container.StateConditions.Exit == nil || container.StateConditions.Exit.Status != "success" {
+			for _, port := range container.Ports {
+				// TODO: get the address of the default gw interafce and print it here
+				fmt.Printf("%s/%s --> %s:%d\n", name, port.Name, "address", port.HostPort)
+			}
 		}
 	}
 }
