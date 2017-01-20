@@ -19,8 +19,11 @@ func (cond *ExitCondition) Handle(command *exec.Cmd, results chan<- error, stop 
 	waitResult := make(chan error)
 	// start a command wait
 	go func(command *exec.Cmd, result chan<- error) {
-		err := command.Wait()
-		result <- err
+		select {
+		case result <- command.Wait():
+		case <-stop:
+			return
+		}
 	}(command, waitResult)
 
 	// wait for the command to exit and grab the exit code or listen for a stop command
@@ -39,7 +42,6 @@ func (cond *ExitCondition) Handle(command *exec.Cmd, results chan<- error, stop 
 		}
 		logger.Printf("Received Exit Code: %d\n", exitCode)
 	case <-stop:
-		logger.Println("Waiting for Exit Cancelled")
 		return
 	}
 

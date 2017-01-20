@@ -35,7 +35,7 @@ func (volume *Volume) CreateDir() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("Changing Ownership to %s:%s\n", volume.UID, volume.GID)
+		log.Printf("Changing Ownership to %d:%d\n", volume.UID, volume.GID)
 		err = os.Chown(volume.Path, volume.UID, volume.GID)
 		if err != nil {
 			return err

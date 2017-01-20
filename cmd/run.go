@@ -22,6 +22,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/dansteen/constellation/config"
 	"github.com/dansteen/constellation/types"
@@ -165,14 +166,18 @@ func run(cmd *cobra.Command, args []string) {
 		util.Check(err)
 	}
 
+	// grab our host address
+	address := util.GetDefaultIP()
 	// after we have brought everything up we print out connection information
+	output := tabwriter.NewWriter(os.Stdout, 0, 4, 0, ' ', 0)
 	for name, container := range configData.Containers {
 		// we only print out infomration for containers that are not expected to exit
 		if container.StateConditions.Exit == nil || container.StateConditions.Exit.Status != "success" {
 			for _, port := range container.Ports {
 				// TODO: get the address of the default gw interafce and print it here
-				fmt.Printf("%s/%s --> %s:%d\n", name, port.Name, "address", port.HostPort)
+				fmt.Fprintf(output, "%s/%s -->\t %s:%d\n", name, port.Name, address, port.HostPort)
 			}
 		}
 	}
+	output.Flush()
 }

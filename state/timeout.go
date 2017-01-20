@@ -18,14 +18,17 @@ func (cond *TimeoutCondition) Handle(results chan<- error, stop <-chan bool, log
 	timeout := make(chan bool)
 	go func() {
 		time.Sleep(time.Second * time.Duration(cond.Duration))
-		timeout <- true
+		select {
+		case timeout <- true:
+		case <-stop:
+			return
+		}
 	}()
 	// wait for our timeout or the done channel
 	select {
 	case <-timeout:
 		logger.Println("Hit Timeout")
 	case <-stop:
-		logger.Println("Timeout Cancelled")
 		return
 	}
 

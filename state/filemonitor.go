@@ -63,17 +63,16 @@ func (monitor *FileMonitorCondition) Handle(results chan<- error, stop <-chan bo
 	for {
 		select {
 		case <-stop:
-			logger.Printf("Cancelled Monitoring %s for %s\n", monitor.File, monitor.Regex.String())
 			tail.Stop()
 			return
 		case line := <-tail.Lines:
 			if monitor.Regex.Match([]byte(line.Text)) == true {
 				if monitor.Status == "success" {
-					logger.Printf("%s matched %s. Success.\n", monitor.File, monitor.Regex.String())
+					logger.Printf("Matched %s to %s. Success.\n", monitor.File, monitor.Regex.String())
 					results <- nil
 				}
 				if monitor.Status == "failure" {
-					results <- errors.New(fmt.Sprintf("%s matched %s. Specified as failure\n", monitor.File, monitor.Regex.String()))
+					results <- errors.New(fmt.Sprintf("Matched %s to %s. Specified as failure\n", monitor.File, monitor.Regex.String()))
 				}
 				// stop tailing
 				tail.Stop()

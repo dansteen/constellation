@@ -210,9 +210,11 @@ func (container *Container) Run(configPath string, projectName string, volumes m
 	if container.StateConditions.Count() != 0 {
 		result = <-status
 		// once one condition returns, we cancel the rest
-		for i := 0; i < numHandlers; i++ {
-			stop <- true
-		}
+		close(stop)
+		close(status)
+		//for i := 0; i < numHandlers; i++ {
+		//	stop <- true
+		//}
 	}
 
 	return result
@@ -262,7 +264,6 @@ func (container *Container) handleOutput(scanner *bufio.Scanner, source string, 
 		// check if we still need to handle state conditions
 		select {
 		case <-stop:
-			logger.Printf("Cancelled Monitoring %s\n", source)
 			conditions = make([]*state.OutputCondition, 0)
 		default:
 			moreContent := scanner.Scan()
