@@ -368,3 +368,7 @@ This would then be run with the following invocation:
 - Setting a Volume with Kind to "empty" will result in constellation not being able to monitor the files referenced in those volumes, 
   but also not reporting an error
 - The "clean" command does not always remove all containers in a single run.  Multiple runs will fix this for now.
+- When a project contains transient containers (containers that are expected to exit) re-running the project without running "clean" first will attempt to re-run those transient containers.  If they make changes that are not idempotent (e.g. db migrations etc) they are likely to fail.  I have a fix for this, but have not had a chance to implement it yet.
+
+# TODO
+- Clean up output - its a bit too verbose
